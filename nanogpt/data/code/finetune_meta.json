@@ -1,0 +1,13 @@
+{
+  "dataset": "nickrosh/Evol-Instruct-Code-80k-v1",
+  "n_items_used": 78155,
+  "n_items_skipped": 109,
+  "n_train_tokens": 28803008,
+  "n_val_tokens": 3200320,
+  "n_train_chunks": 450047,
+  "n_val_chunks": 50005,
+  "chunk_size": 64,
+  "n_neighbors": 2,
+  "bank_source": "wiki-only (data/bank/cell_tokens.npy)",
+  "n_bank_cells": 1817204
+}

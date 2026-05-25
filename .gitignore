@@ -1,0 +1,30 @@
+# Virtual environments
+.venv/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+
+# Large data files
+*.npy
+*.bin
+*.pt
+*.db
+*.db-shm
+*.db-wal
+
+# Archives
+*.tar.gz
+
+# Training outputs (keep history.json, ignore checkpoints)
+nanogpt/out-*/ckpt*.pt
+
+# OS / IDE
+.DS_Store
+Thumbs.db
+.vscode/
+*.swp
+
+# Notebook checkpoints
+.ipynb_checkpoints/

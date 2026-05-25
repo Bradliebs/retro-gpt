@@ -1,0 +1,16 @@
+{
+  "bank_source_wiki": "wikimedia/wikipedia:20231101.en + 20231101.simple",
+  "bank_source_code": "sahil2801/CodeAlpaca-20k",
+  "heldout_source": "iamtarun/python_code_instructions_18k_alpaca (last 5k)",
+  "n_wiki_cells": 1817204,
+  "n_code_cells": 28503,
+  "n_combined_cells": 1845707,
+  "n_code_items_used": 14851,
+  "n_heldout_functions": 4697,
+  "n_heldout_tokens_raw": 1765749,
+  "n_heldout_tokens_used": 1765696,
+  "n_heldout_chunks": 27589,
+  "chunk_size": 64,
+  "neighbor_len": 64,
+  "n_neighbors": 2
+}

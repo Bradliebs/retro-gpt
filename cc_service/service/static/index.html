@@ -1,0 +1,443 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Concept Cells — Memory Bank</title>
+<style>
+  :root {
+    --bg: #0d1117; --surface: #161b22; --border: #30363d;
+    --text: #c9d1d9; --text-dim: #8b949e; --accent: #58a6ff;
+    --green: #3fb950; --red: #f85149; --orange: #d29922;
+    --radius: 8px;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+         background: var(--bg); color: var(--text); min-height: 100vh; }
+
+  /* Layout */
+  .app { display: grid; grid-template-columns: 320px 1fr; grid-template-rows: auto 1fr; height: 100vh; }
+  header { grid-column: 1 / -1; display: flex; align-items: center; gap: 16px;
+           padding: 12px 24px; border-bottom: 1px solid var(--border); background: var(--surface); }
+  header h1 { font-size: 18px; font-weight: 600; }
+  header .status { margin-left: auto; font-size: 13px; color: var(--text-dim); }
+  header .dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; margin-right: 4px; }
+  header .dot.ok { background: var(--green); }
+  header .dot.err { background: var(--red); }
+
+  .sidebar { border-right: 1px solid var(--border); overflow-y: auto; background: var(--surface); display: flex; flex-direction: column; }
+  .sidebar-header { padding: 12px 16px; border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+  .sidebar-header h2 { font-size: 14px; font-weight: 600; flex: 1; }
+  .sidebar-header .count { font-size: 12px; color: var(--text-dim); }
+  .cell-list { flex: 1; overflow-y: auto; }
+  .cell-item { padding: 10px 16px; border-bottom: 1px solid var(--border); cursor: pointer; transition: background 0.15s; }
+  .cell-item:hover { background: rgba(88,166,255,0.08); }
+  .cell-item.selected { background: rgba(88,166,255,0.15); border-left: 3px solid var(--accent); }
+  .cell-item .id { font-size: 12px; color: var(--text-dim); }
+  .cell-item .label { font-size: 14px; margin-top: 2px; }
+  .cell-item .kind { font-size: 11px; padding: 2px 6px; border-radius: 10px; display: inline-block; margin-top: 4px; }
+  .cell-item .kind.single { background: rgba(88,166,255,0.2); color: var(--accent); }
+  .cell-item .kind.bound { background: rgba(210,153,34,0.2); color: var(--orange); }
+
+  .main { display: flex; flex-direction: column; overflow: hidden; }
+
+  /* Tabs */
+  .tabs { display: flex; border-bottom: 1px solid var(--border); background: var(--surface); flex-shrink: 0; }
+  .tab { padding: 10px 20px; font-size: 14px; color: var(--text-dim); cursor: pointer; border-bottom: 2px solid transparent; transition: all 0.15s; }
+  .tab:hover { color: var(--text); }
+  .tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+
+  .panels { flex: 1; overflow-y: auto; padding: 24px; }
+  .panel { display: none; }
+  .panel.active { display: block; }
+
+  /* Forms */
+  input, textarea { width: 100%; background: var(--bg); border: 1px solid var(--border); color: var(--text);
+                     border-radius: var(--radius); padding: 10px 12px; font-size: 14px; font-family: inherit;
+                     outline: none; transition: border 0.15s; }
+  input:focus, textarea:focus { border-color: var(--accent); }
+  textarea { resize: vertical; min-height: 100px; }
+  label { font-size: 13px; color: var(--text-dim); margin-bottom: 4px; display: block; }
+  .field { margin-bottom: 16px; }
+  .row { display: flex; gap: 12px; }
+  .row > .field { flex: 1; }
+
+  btn, button, .btn { display: inline-flex; align-items: center; gap: 6px; padding: 8px 16px;
+         border-radius: var(--radius); font-size: 14px; font-weight: 500; cursor: pointer; border: 1px solid var(--border);
+         background: var(--surface); color: var(--text); transition: all 0.15s; }
+  .btn:hover { border-color: var(--accent); color: var(--accent); }
+  .btn.primary { background: var(--accent); color: #000; border-color: var(--accent); }
+  .btn.primary:hover { opacity: 0.9; }
+  .btn.danger { color: var(--red); }
+  .btn.danger:hover { border-color: var(--red); }
+  .btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+  /* Query results */
+  .hit { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 16px; margin-bottom: 12px; }
+  .hit-header { display: flex; align-items: center; gap: 12px; margin-bottom: 8px; }
+  .hit-score { font-size: 24px; font-weight: 700; color: var(--accent); min-width: 60px; }
+  .hit-label { font-size: 15px; font-weight: 500; }
+  .hit-text { font-size: 13px; color: var(--text-dim); line-height: 1.5; }
+  .hit-meta { font-size: 12px; color: var(--text-dim); margin-top: 8px; }
+
+  /* Cell detail */
+  .detail-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 20px; }
+  .detail-card h3 { font-size: 18px; margin-bottom: 12px; }
+  .detail-meta { display: grid; grid-template-columns: auto 1fr; gap: 6px 16px; font-size: 13px; margin-bottom: 16px; }
+  .detail-meta dt { color: var(--text-dim); }
+  .detail-text { background: var(--bg); border-radius: var(--radius); padding: 16px; font-size: 14px; line-height: 1.6; white-space: pre-wrap; }
+  .actions { display: flex; gap: 8px; margin-top: 16px; }
+
+  /* Bind UI */
+  .bind-selected { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 16px; min-height: 40px;
+                    border: 1px dashed var(--border); border-radius: var(--radius); padding: 8px; }
+  .bind-chip { display: inline-flex; align-items: center; gap: 4px; padding: 4px 10px;
+               background: rgba(210,153,34,0.2); color: var(--orange); border-radius: 12px; font-size: 13px; }
+  .bind-chip .remove { cursor: pointer; opacity: 0.6; }
+  .bind-chip .remove:hover { opacity: 1; }
+
+  .empty { text-align: center; padding: 48px 24px; color: var(--text-dim); }
+  .empty p { margin-top: 8px; }
+
+  .toast { position: fixed; bottom: 24px; right: 24px; background: var(--surface); border: 1px solid var(--border);
+           border-radius: var(--radius); padding: 12px 20px; font-size: 14px; z-index: 100;
+           transform: translateY(100px); opacity: 0; transition: all 0.3s; }
+  .toast.show { transform: translateY(0); opacity: 1; }
+  .toast.success { border-color: var(--green); }
+  .toast.error { border-color: var(--red); }
+
+  .spinner { display: inline-block; width: 16px; height: 16px; border: 2px solid var(--border);
+             border-top-color: var(--accent); border-radius: 50%; animation: spin 0.6s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* Bind checkbox in sidebar */
+  .cell-item .bind-check { float: right; margin-top: 4px; }
+
+  /* Filter */
+  .filter-bar { padding: 8px 16px; border-bottom: 1px solid var(--border); flex-shrink: 0; }
+  .filter-bar input { font-size: 13px; padding: 6px 10px; }
+</style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <h1>🧠 Concept Cells</h1>
+    <div class="status"><span class="dot" id="statusDot"></span><span id="statusText">connecting...</span></div>
+  </header>
+
+  <div class="sidebar">
+    <div class="sidebar-header">
+      <h2>Cells</h2>
+      <span class="count" id="cellCount">0</span>
+      <button class="btn" onclick="refreshCells()" title="Refresh">↻</button>
+    </div>
+    <div class="filter-bar">
+      <input type="text" id="filterInput" placeholder="Filter cells..." oninput="filterCells()">
+    </div>
+    <div class="cell-list" id="cellList"></div>
+  </div>
+
+  <div class="main">
+    <div class="tabs">
+      <div class="tab active" data-tab="query" onclick="switchTab('query')">🔍 Query</div>
+      <div class="tab" data-tab="add" onclick="switchTab('add')">✏️ Add</div>
+      <div class="tab" data-tab="bind" onclick="switchTab('bind')">🔗 Bind</div>
+      <div class="tab" data-tab="detail" onclick="switchTab('detail')">📄 Detail</div>
+    </div>
+
+    <div class="panels">
+      <!-- Query Panel -->
+      <div class="panel active" id="panel-query">
+        <div class="field">
+          <label>Search your memory bank</label>
+          <textarea id="queryText" rows="3" placeholder="Enter a concept, question, or passage..."></textarea>
+        </div>
+        <div class="row">
+          <div class="field">
+            <label>Top K</label>
+            <input type="number" id="queryK" value="10" min="1" max="100">
+          </div>
+          <div class="field" style="display:flex;align-items:flex-end;">
+            <button class="btn primary" id="queryBtn" onclick="doQuery()">Search</button>
+          </div>
+        </div>
+        <div id="queryResults" style="margin-top:20px;"></div>
+      </div>
+
+      <!-- Add Panel -->
+      <div class="panel" id="panel-add">
+        <div class="field">
+          <label>Text</label>
+          <textarea id="addText" rows="6" placeholder="Paste text to remember..."></textarea>
+        </div>
+        <div class="row">
+          <div class="field">
+            <label>Label (optional)</label>
+            <input type="text" id="addLabel" placeholder="Short name for this concept">
+          </div>
+          <div class="field" style="display:flex;align-items:flex-end;">
+            <button class="btn primary" onclick="doAdd()">Add Cell</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Bind Panel -->
+      <div class="panel" id="panel-bind">
+        <p style="color:var(--text-dim);margin-bottom:12px;">Select 2+ cells from the sidebar, then bind them into a composite concept.</p>
+        <div class="field">
+          <label>Selected cells to bind</label>
+          <div class="bind-selected" id="bindSelected">
+            <span style="color:var(--text-dim);font-size:13px;">Click cells in the sidebar to select...</span>
+          </div>
+        </div>
+        <div class="field">
+          <label>Label for bound cell</label>
+          <input type="text" id="bindLabel" placeholder="Name for the composite concept">
+        </div>
+        <button class="btn primary" id="bindBtn" onclick="doBind()" disabled>Bind Selected</button>
+        <div id="bindResult" style="margin-top:16px;"></div>
+      </div>
+
+      <!-- Detail Panel -->
+      <div class="panel" id="panel-detail">
+        <div id="detailContent">
+          <div class="empty">
+            <p>Select a cell from the sidebar to view details</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const API = '';  // same origin
+let allCells = [];
+let selectedCellId = null;
+let bindSet = new Set();
+
+// --- API helpers ---
+async function api(method, path, body) {
+  const opts = { method, headers: { 'Content-Type': 'application/json' } };
+  if (body) opts.body = JSON.stringify(body);
+  const r = await fetch(API + path, opts);
+  if (!r.ok) {
+    const err = await r.json().catch(() => ({ detail: r.statusText }));
+    throw new Error(err.detail || r.statusText);
+  }
+  return r.json();
+}
+
+function toast(msg, type = 'success') {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = 'toast show ' + type;
+  setTimeout(() => t.className = 'toast', 3000);
+}
+
+// --- Health check ---
+async function checkHealth() {
+  try {
+    const data = await api('GET', '/info');
+    document.getElementById('statusDot').className = 'dot ok';
+    document.getElementById('statusText').textContent =
+      data.initialized ? `${data.n_cells} cells · ${data.dim}d` : 'not initialized';
+  } catch {
+    document.getElementById('statusDot').className = 'dot err';
+    document.getElementById('statusText').textContent = 'offline';
+  }
+}
+
+// --- Cells ---
+async function refreshCells() {
+  try {
+    const data = await api('GET', '/cells?limit=1000');
+    allCells = data.cells;
+    document.getElementById('cellCount').textContent = data.total;
+    renderCellList(allCells);
+  } catch (e) { toast(e.message, 'error'); }
+}
+
+function filterCells() {
+  const q = document.getElementById('filterInput').value.toLowerCase();
+  const filtered = allCells.filter(c =>
+    (c.label || '').toLowerCase().includes(q) ||
+    (c.source_text || '').toLowerCase().includes(q) ||
+    String(c.id).includes(q)
+  );
+  renderCellList(filtered);
+}
+
+function renderCellList(cells) {
+  const activeTab = document.querySelector('.tab.active')?.dataset.tab;
+  const showCheckboxes = activeTab === 'bind';
+  const el = document.getElementById('cellList');
+  if (!cells.length) { el.innerHTML = '<div class="empty"><p>No cells yet</p></div>'; return; }
+  el.innerHTML = cells.map(c => `
+    <div class="cell-item ${c.id === selectedCellId ? 'selected' : ''}" onclick="selectCell(${c.id})" data-id="${c.id}">
+      ${showCheckboxes ? `<input type="checkbox" class="bind-check" ${bindSet.has(c.id) ? 'checked' : ''}
+         onclick="event.stopPropagation(); toggleBind(${c.id})" title="Select for binding">` : ''}
+      <div class="id">#${c.id} · ${new Date(c.created_at * 1000).toLocaleDateString()}</div>
+      <div class="label">${esc(c.label || truncate(c.source_text || '(no text)', 60))}</div>
+      <span class="kind ${c.kind}">${c.kind}</span>
+    </div>
+  `).join('');
+}
+
+function truncate(s, n) { return s.length > n ? s.slice(0, n) + '…' : s; }
+function esc(s) { const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
+
+async function selectCell(id) {
+  selectedCellId = id;
+  renderCellList(allCells.filter(c => {
+    const q = document.getElementById('filterInput').value.toLowerCase();
+    return !q || (c.label||'').toLowerCase().includes(q) || (c.source_text||'').toLowerCase().includes(q) || String(c.id).includes(q);
+  }));
+  switchTab('detail');
+  try {
+    const c = await api('GET', `/cells/${id}`);
+    document.getElementById('detailContent').innerHTML = `
+      <div class="detail-card">
+        <h3>${esc(c.label || '(unlabelled)')}</h3>
+        <dl class="detail-meta">
+          <dt>ID</dt><dd>#${c.id}</dd>
+          <dt>Kind</dt><dd>${c.kind}</dd>
+          <dt>Theta</dt><dd>${c.theta.toFixed(4)}</dd>
+          <dt>Created</dt><dd>${new Date(c.created_at * 1000).toLocaleString()}</dd>
+          ${c.source_cell_ids ? `<dt>Sources</dt><dd>${c.source_cell_ids.map(i => '#'+i).join(', ')}</dd>` : ''}
+        </dl>
+        ${c.source_text ? `<div class="detail-text">${esc(c.source_text)}</div>` : ''}
+        <div class="actions">
+          <button class="btn" onclick="queryLike(${c.id})">Find similar</button>
+          <button class="btn danger" onclick="deleteCell(${c.id})">Delete</button>
+        </div>
+      </div>
+    `;
+  } catch (e) { toast(e.message, 'error'); }
+}
+
+async function queryLike(id) {
+  const cell = allCells.find(c => c.id === id);
+  if (!cell?.source_text) { toast('No source text to query with', 'error'); return; }
+  document.getElementById('queryText').value = cell.source_text;
+  switchTab('query');
+  doQuery();
+}
+
+async function deleteCell(id) {
+  if (!confirm(`Delete cell #${id}?`)) return;
+  try {
+    await api('DELETE', `/cells/${id}`);
+    toast(`Cell #${id} deleted`);
+    refreshCells();
+    document.getElementById('detailContent').innerHTML = '<div class="empty"><p>Cell deleted</p></div>';
+  } catch (e) { toast(e.message, 'error'); }
+}
+
+// --- Query ---
+async function doQuery() {
+  const text = document.getElementById('queryText').value.trim();
+  if (!text) return;
+  const k = parseInt(document.getElementById('queryK').value) || 10;
+  const btn = document.getElementById('queryBtn');
+  btn.disabled = true; btn.innerHTML = '<span class="spinner"></span> Searching...';
+  try {
+    const data = await api('POST', '/query', { text, top_k: k, include_silent: true });
+    const el = document.getElementById('queryResults');
+    if (!data.hits.length) { el.innerHTML = '<div class="empty"><p>No matches found</p></div>'; return; }
+    el.innerHTML = data.hits.map(h => `
+      <div class="hit" onclick="selectCell(${h.cell_id})" style="cursor:pointer;">
+        <div class="hit-header">
+          <div class="hit-score">${(h.activation * 100).toFixed(0)}%</div>
+          <div>
+            <div class="hit-label">${esc(h.label || '(unlabelled)')}</div>
+            <div class="hit-meta">#${h.cell_id} · ${h.kind} · margin: ${h.margin.toFixed(3)}</div>
+          </div>
+        </div>
+        ${h.source_text ? `<div class="hit-text">${esc(truncate(h.source_text, 300))}</div>` : ''}
+      </div>
+    `).join('');
+  } catch (e) { toast(e.message, 'error'); }
+  finally { btn.disabled = false; btn.textContent = 'Search'; }
+}
+
+// --- Add ---
+async function doAdd() {
+  const text = document.getElementById('addText').value.trim();
+  const label = document.getElementById('addLabel').value.trim() || null;
+  if (!text) { toast('Enter some text', 'error'); return; }
+  try {
+    const data = await api('POST', '/write', { text, label });
+    toast(`Cell #${data.cell_id} created`);
+    document.getElementById('addText').value = '';
+    document.getElementById('addLabel').value = '';
+    refreshCells();
+  } catch (e) { toast(e.message, 'error'); }
+}
+
+// --- Bind ---
+function toggleBind(id) {
+  if (bindSet.has(id)) bindSet.delete(id); else bindSet.add(id);
+  updateBindUI();
+  renderCellList(allCells);
+}
+
+function updateBindUI() {
+  const el = document.getElementById('bindSelected');
+  if (!bindSet.size) { el.innerHTML = '<span style="color:var(--text-dim);font-size:13px;">Click cells in the sidebar to select...</span>'; }
+  else {
+    el.innerHTML = [...bindSet].map(id => {
+      const c = allCells.find(x => x.id === id);
+      return `<span class="bind-chip">#${id} ${esc(c?.label || '')} <span class="remove" onclick="event.stopPropagation();toggleBind(${id})">✕</span></span>`;
+    }).join('');
+  }
+  document.getElementById('bindBtn').disabled = bindSet.size < 2;
+}
+
+async function doBind() {
+  const ids = [...bindSet];
+  const label = document.getElementById('bindLabel').value.trim() || null;
+  try {
+    const data = await api('POST', '/bind', { source_cell_ids: ids, label });
+    toast(`Bound cell #${data.bound_cell_id} created`);
+    bindSet.clear();
+    updateBindUI();
+    document.getElementById('bindLabel').value = '';
+    refreshCells();
+    document.getElementById('bindResult').innerHTML = `
+      <div class="hit">
+        <div class="hit-header">
+          <div class="hit-label">Created bound cell #${data.bound_cell_id}</div>
+        </div>
+        <div class="hit-meta">Sources: ${data.source_cell_ids.map(i=>'#'+i).join(', ')} · θ=${data.theta_readout.toFixed(4)} · alignment=${data.alignment_to_mean.toFixed(4)}</div>
+      </div>
+    `;
+  } catch (e) { toast(e.message, 'error'); }
+}
+
+// --- Tabs ---
+function switchTab(name) {
+  document.querySelectorAll('.tab').forEach(t => t.classList.toggle('active', t.dataset.tab === name));
+  document.querySelectorAll('.panel').forEach(p => p.classList.toggle('active', p.id === 'panel-' + name));
+  // Re-render sidebar to show/hide bind checkboxes
+  filterCells();
+  if (name === 'bind') updateBindUI();
+}
+
+// --- Keyboard shortcut ---
+document.getElementById('queryText')?.addEventListener('keydown', e => {
+  if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); doQuery(); }
+});
+document.getElementById('addText')?.addEventListener('keydown', e => {
+  if (e.key === 'Enter' && e.ctrlKey) { e.preventDefault(); doAdd(); }
+});
+
+// --- Init ---
+checkHealth();
+refreshCells();
+setInterval(checkHealth, 30000);
+</script>
+</body>
+</html>

@@ -1,0 +1,14 @@
+{
+  "dataset": "wikimedia/wikipedia:20231101.en",
+  "skip_articles": 100000,
+  "n_articles_requested": 5000,
+  "n_articles_used": 5000,
+  "n_paragraphs": 47999,
+  "n_tokens_raw": 4475401,
+  "n_tokens_used": 4475392,
+  "n_chunks": 69928,
+  "chunk_size": 64,
+  "neighbor_len": 64,
+  "n_neighbors": 2,
+  "min_chars": 80
+}

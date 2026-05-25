@@ -1,0 +1,20 @@
+{
+  "encoding": "gpt2",
+  "vocab_size_raw": 50257,
+  "vocab_size_padded": 50304,
+  "eot_token": 50256,
+  "n_cells_total": 1817204,
+  "n_val_cells": 90860,
+  "n_train_cells": 1726344,
+  "n_train_tokens": 156956621,
+  "n_val_tokens": 8298187,
+  "val_fraction": 0.05,
+  "seed": 1337,
+  "source_db": "H:\\MiniLM\\cc_service\\bank.db",
+  "n_bank_cells": 1817204,
+  "chunk_size": 64,
+  "neighbor_len": 64,
+  "n_neighbors": 2,
+  "n_train_chunks": 2452447,
+  "n_val_chunks": 129659
+}
